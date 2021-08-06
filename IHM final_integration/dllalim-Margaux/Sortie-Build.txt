@@ -1,0 +1,9 @@
+﻿L'opération de regénération a démarré...
+1>------ Début de la regénération globale : Projet : testDLLAlim, Configuration : Debug Any CPU ------
+2>------ Début de la regénération globale : Projet : consoleDLLAlim, Configuration : Debug Any CPU ------
+2>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\MSBuild\Current\Bin\Microsoft.Common.CurrentVersion.targets(2182,5): warning MSB3245: Impossible de résoudre cette référence. Impossible de trouver l'assembly "testDLLAlim". Vérifiez que l'assembly existe sur le disque. Si elle est requise par votre code, vous risquez d'obtenir des erreurs de compilation.
+2>C:\Users\MASTER\Documents\DLL\dllalim-Margaux\consoleDLLAlim\consoleDLLAlim.cs(9,7,9,18): error CS0246: Le nom de type ou d'espace de noms 'testDLLAlim' est introuvable (vous manque-t-il une directive using ou une référence d'assembly ?)
+1>  testDLLAlim -> C:\Users\MASTER\Documents\DLL\dllalim-Margaux\testDLLAlim\bin\Debug\testDLLAlim.dll
+3>------ Début de la regénération globale : Projet : ConsoleApp1, Configuration : Debug Any CPU ------
+3>  ConsoleApp1 -> C:\Users\MASTER\Documents\DLL\dllalim-Margaux\ConsoleApp1\bin\Debug\ConsoleApp1.exe
+========== Regénération globale : 2 a réussi, 1 a échoué, 0 a été ignoré ==========

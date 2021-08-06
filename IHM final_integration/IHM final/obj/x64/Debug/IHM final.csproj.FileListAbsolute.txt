@@ -1,0 +1,19 @@
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\IHM final.exe.config
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\IHM final.exe
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\IHM final.pdb
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\DLLSpectrometer.dll
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\testDLLAlim.dll
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\DLLSpectrometer.pdb
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\bin\x64\Debug\testDLLAlim.pdb
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\MainWindow.g.cs
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\App.g.cs
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final_MarkupCompile.cache
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final_MarkupCompile.lref
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\MainWindow.baml
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.g.resources
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM_final.Properties.Resources.resources
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.csproj.GenerateResource.cache
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.csproj.CoreCompileInputs.cache
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.csproj.CopyComplete
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.exe
+C:\Users\perre\Desktop\IHM_Git\IHM final_integration\IHM final\obj\x64\Debug\IHM final.pdb

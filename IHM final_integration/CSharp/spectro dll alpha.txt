@@ -1,0 +1,298 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using InstrumentSystems.CAS4;
+
+namespace Monspectro
+{
+    public class MonSpectro
+    {
+        public const string filepath = @"C:\Users\Administrator\Documents\spectrometre\bin\Debug\spectrometre.dll";
+        public const string versiondll = @"1.0.0.0";
+        public StringBuilder sb = new StringBuilder(256);     //conteneur pour message erreur ou  nom interface etc string 
+        public const int demo = CAS4DLL.InterfaceTest;           //interfce de demo utilise quand on a pa de spectro
+        public const int chargeConf = CAS4DLL.dpidConfigFileName;           //charge le ficheir de conf
+        public const int chargeCalib = CAS4DLL.dpidCalibFileName;       //charge le fichier  de calib
+        public const int filetrans = CAS4DLL.dpidTransmissionFileName;       //same pour transmission
+        public const int initializeSpectrometre = CAS4DLL.InitForced;      
+        public const int minEntrechaqueMesure = CAS4DLL.dpidIntTimeMin;    //constante integration time min 
+        public const int maxEntrechaqueMesure = CAS4DLL.dpidIntTimeMax;     //                          max
+        public const int parametreProchaineMesure = CAS4DLL.mpidIntegrationTime;      //pareil
+        public const int maxADC = CAS4DLL.mpidMaxADCValue;     
+        public const int uniterCalib = CAS4DLL.dpidCalibrationUnit;
+        public const int retourneNbMilePasse = CAS4DLL.mpidLastDCAge;
+        public const int dpidcurrent = CAS4DLL.dpidNeedDarkCurrent;
+        public const int init = CAS4DLL.InitForced;
+        public const int rechercheDevice = CAS4DLL.paSearchForDevices;
+        public const int startmultitrack = CAS4DLL.paMultiTrackStart;
+        public const int stringconf = CAS4DLL.dpidCheckConfigFileSerial;
+        public const int stringfile = CAS4DLL.dpidCheckCalibFileSerial;
+        public const int dpidparam = CAS4DLL.dpidParamSets;
+        public const int currentparazm = CAS4DLL.dpidCurrentParamSet;
+        public const int name = CAS4DLL.dpidSpectrometerName;
+        public const int interfacee = CAS4DLL.dpidInterfaceType;
+        public const int TCO = CAS4DLL.tcoCanTrigger;
+        public const int dpidTriggeercap = CAS4DLL.dpidTriggerCapabilities;
+        public const int TriggerOptions = CAS4DLL.mpidTriggerOptions;
+        public const int TriggerSource = CAS4DLL.mpidTriggerSource;
+        public const int FlipFlop = CAS4DLL.trgFlipFlop;
+        public const int DelayTime = CAS4DLL.mpidTriggerDelayTime;
+        public const int mpidTriggertimout = CAS4DLL.mpidTriggerTimeout;
+        public const int prepar = CAS4DLL.paPrepareMeasurement;
+        public const int dpidTransmission = CAS4DLL.dpidTransmissionFileName;
+        public const int filterchange = CAS4DLL.dpidNeedDensityFilterChange;
+        public const int densityfilter = CAS4DLL.mpidDensityFilter;
+        public const int newdensity = CAS4DLL.mpidNewDensityFilter;
+        public const int needdark = CAS4DLL.dpidNeedDarkCurrent;
+        public const int UseTransmission = CAS4DLL.coUseTransmission;
+
+
+
+
+       
+
+
+
+
+
+
+
+
+
+        public static int interfaceType()
+        {
+
+            //done le nombre d'interface supportÃ© par la dll
+
+            return CAS4DLL.casGetDeviceTypes();
+
+
+
+
+        }
+        public static IntPtr nameInterface(int i, StringBuilder sb, int sbb)
+        {
+            //donne le nom des interface installÃ© (pour le spectrometre)
+            //i=utilisé dans une boucle
+            //sb pour contenir les nom 
+            //sbb c'est sb.capacity'
+            return CAS4DLL.casGetDeviceTypeName(i, sb, sbb);
+
+        }
+        public static int optionSType(int AInterfaceType)
+        {
+            //RÃ©cupÃ¨re le nombre d'options qu'un type d'interface donnÃ© prend actuellement en charge
+            
+            return CAS4DLL.casGetDeviceTypeOptions(AInterfaceType);
+
+
+        }
+        public static int optionType(int AInterfaceType, int AIindex)
+        {
+            //Renvoie la valeur de l'option d'interface pour le type d'interface et l'index d'option donnÃ©s
+            return CAS4DLL.casGetDeviceTypeOption(AInterfaceType, AIindex);
+
+
+        }
+        public static IntPtr nameOption(int i, int sbb, StringBuilder sb, int biboux)
+        {
+            //donne le nom des options specifiques de chaque spectrometres
+            return CAS4DLL.casGetDeviceTypeOptionName(i, sbb, sb, biboux);
+
+        }
+        public static int creationSpectrometre(int Interface, int option)
+        {
+            //creer le spectrometre avec son interface et son option
+            return CAS4DLL.casCreateDeviceEx(Interface, option);
+
+        }
+        public static int creerParametreConfig(int adevice, int what, string value)
+        {
+            return CAS4DLL.casSetDeviceParameterString(adevice, what, value);
+            //aedevice=monspectro
+            //what=variable dans la dll comme le fichier de conf
+            //value=chemin de la variable , ou di fichier
+
+        }
+        public static int initializerSpectrometre(int adevice, int parameetre)
+        {
+            return CAS4DLL.casInitialize(adevice, parameetre);
+            //aedevice=monspectro
+            //param=variable qui sert dinitialisation dans la dll
+        }
+        public static double recupererParametreConfig(int adevice, int awhat)
+        {
+
+            return CAS4DLL.casGetDeviceParameter(adevice, awhat);
+            //aedevice=monspectro
+            //awhat=integration time min et max 
+        }
+        public static int definirParametreMesure(int device, int what, double newvalue)
+        {
+            return CAS4DLL.casSetMeasurementParameter(device, what, newvalue);
+            //device=monspectro
+            //what=variable prochaine mesure  constn dans dll
+            //newvalue=nouvelle valeur utilisé dans les parametre (ideallement un scroll bar)
+        }
+        public static int Mesurer(int adevice)
+        {
+            return CAS4DLL.casMeasure(adevice);
+        }
+        public static double recupererParametreMesure(int device, int what)
+        {
+
+            return CAS4DLL.casGetMeasurementParameter(device, what);
+            //what=const dans la dll
+        }
+        public static int RecupereParametreCaractere(int ADevice, int AWhat, StringBuilder ADest, int AMaxLen)
+        {
+            return CAS4DLL.casGetDeviceParameterString(ADevice, AWhat, ADest, AMaxLen);
+            //what =const dll
+            //ADest=string conteneur comme sb plus haut 
+            //amaxlen=capacity comme plus haut (sb)
+        }
+        public static int calculColometric(int ADevice)
+        {
+            return CAS4DLL.casColorMetric(ADevice);
+        }
+        public static void ObtenirRadInt(int ADevice, out double ARadInt, StringBuilder AUnit, int AUnitMaxLen)
+        {
+            CAS4DLL.casGetRadInt(ADevice, out ARadInt, AUnit, AUnitMaxLen);
+            //aradint=variable creé dans le programme pour calc radiometric 
+            //aunit /aunitmaxlen=pareil que la fonction avant
+        }
+        public static void ObtenirPhotInt(int ADevice, out double APhotInt, StringBuilder AUnit, int AUnitMaxLen)
+        {
+            CAS4DLL.casGetPhotInt(ADevice, out APhotInt, AUnit, AUnitMaxLen);
+            //aphointin = pareil mais pour photometric ....
+            //le rest pareil 
+        }
+        public static double obtenirCentroid(int ADevice)
+        {
+            return CAS4DLL.casGetCentroid(ADevice);
+        }
+        public static Double casgetdevicepapr(int evice, int awaht)
+        {
+
+            return CAS4DLL.casGetDeviceParameter(evice, awaht);
+            //non utilise pour le moment 
+
+        }
+        public static void parametrerObturateur(int adevice, int off)
+        {
+            CAS4DLL.casSetShutter(adevice, off);
+            //device =monspectro
+            //off=param genr 1 c'est allume 0 etin )
+        }
+        public static int mesureLecourantdobscurit(int ADevice)
+        {
+            return CAS4DLL.casMeasureDarkCurrent(ADevice);
+        }
+        public static int codeError(int ADevice)
+        {
+            return CAS4DLL.casGetError(ADevice);
+        }
+        public static IntPtr MessageDerreur(int AError, StringBuilder ADest, int AMaxLen)
+        {
+            return CAS4DLL.casGetErrorMessage(AError, ADest, AMaxLen);
+            //aeroor= variable cree dans le p^rogramme 
+            //adest = comme sb sa contien le mesage d'eeruer ...
+            //amaxlen =sb.capacity voir plus haut
+        }
+        public static int detruireSpectro(int ADevice)
+        {
+            return CAS4DLL.casDoneDevice(ADevice);
+        }
+        public static int changerSpectro(int ADevice, int AInterfaceType, int AInterfaceOption)
+        {
+            return CAS4DLL.casChangeDevice(ADevice, AInterfaceType, AInterfaceOption);
+            //monspectro=device
+            //interfacetype=linterface selectionné
+            //pareil pour option 
+        }
+        public static int obtenirchainedecaracSpectro(int ADevice, int AWhat, StringBuilder ADest, int AMaxLen)
+        {
+            return CAS4DLL.casGetDeviceParameterString(ADevice, AWhat, ADest, AMaxLen);
+            //device=le spectro
+            //what=variable cree dans la dll 
+            //sb et sb.capacity
+
+        }
+        public static double obtenirfloatSpectro(int ADevice, int AWhat)
+        {
+            return CAS4DLL.casGetDeviceParameter(ADevice, AWhat);
+            //comme characgterspectro mais en chiffre
+        }
+        public static int setParametreNumeriqueSpectro(int ADevice, int AWhat, double AValue)
+        {
+            return CAS4DLL.casSetDeviceParameter(ADevice, AWhat, AValue);
+            //monspectro...
+            //awhat =varaible utilie dan la dll
+            //avalue =new value
+        }
+        public static int AssignerProprietsAutreSpectro(int ASourceDevice, int ADestDevice, int AOption)
+        {
+            return CAS4DLL.casAssignDeviceEx(ASourceDevice, ADestDevice, AOption);
+            //asourcedevice= spectro
+            //le nouveua spectro=adest
+            //aoption =nouvell valeur du spectro de base -1 ...
+
+        }
+
+        public static int lireDonnAcquis(int ADevice)
+        {
+            return CAS4DLL.casGetFIFOData(ADevice);
+        }
+
+        public static int checkSileSpectroEstEnAttente(int ADevice)
+        {
+            return CAS4DLL.casFIFOHasData(ADevice);
+        }
+
+        public static IntPtr DonnerNomInterface(int AInterfaceType, StringBuilder ADest, int AMaxLen)
+        {
+            return CAS4DLL.casGetDeviceTypeName(AInterfaceType, ADest, AMaxLen);
+            //mponspectro
+            //adest=sb 
+            //sb.capacity
+        }
+        public static int InitialiseBuffer(int ADevice, int ATracks)
+        {
+            //^pareil
+            return CAS4DLL.casMultiTrackInit(ADevice, ATracks);
+        }
+        public static  int FaireACTION(int ADevice, int AActionID, int AParam1, int AParam2, IntPtr AParam3)
+        {
+            //pareil
+            return CAS4DLL.casPerformActionEx(ADevice, AActionID, AParam1, AParam2, AParam3);
+
+        }
+        public static  int casMultiTrackSaveData(int ADevice, string AFileName)
+        {
+            //pareil
+            return CAS4DLL.casMultiTrackSaveData(ADevice, AFileName);
+        }
+        public static  int copydata(int ADevice, int ATrack)
+        {
+            //syncho alim enn cour dexp
+            return CAS4DLL.casMultiTrackCopyData(ADevice, ATrack);
+        }
+        public static void casSetOptionsOnOff(int ADevice, int AOptions, int AOnOff)
+        {
+            //en cour dexperimentation
+           CAS4DLL.casSetOptionsOnOff(ADevice,AOptions,AOnOff);
+        }
+
+        //public static int synchro(int source,int option,int outz,int flip)
+        //  {
+        //    return
+        //    source = flip;
+
+
+
+        //  }
+
+
+    }
+}

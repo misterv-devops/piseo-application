@@ -1,0 +1,6 @@
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\bin\Debug\DLLSpectrometer.dll
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\bin\Debug\DLLSpectrometer.pdb
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\obj\Debug\DLLSpectrometer.csprojAssemblyReference.cache
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\obj\Debug\DLLSpectrometer.csproj.CoreCompileInputs.cache
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\obj\Debug\DLLSpectrometer.dll
+D:\BTS_SNIR\All_Developpement\Projet_PilotageAuto_Piseo\All_SpectroProject\DLLSpectrometer\obj\Debug\DLLSpectrometer.pdb

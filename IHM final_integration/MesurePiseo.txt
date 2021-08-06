@@ -1,0 +1,760 @@
+loadandrunscript
+-- The local functions are scoped at the project level, so that we can keep
+-- track of the reading buffers throughout the test.
+local systemNodes = {}
+local systemSmus = {}
+local systemSmuReadingBufferIndexes = {}
+local appendMode = 1
+
+local gOverrunDetected = false
+--==========================================================================
+-- This function tests for overruns in any of the system smus' trigger models.
+-- It returns an error to the application that will be displayed in a
+-- dialog box if an overrun occurs.
+--==========================================================================
+local _Overruncheck = function()
+    --==========================================================================
+    -- This function test the results of the value in the smu's trigger overrun
+    -- status register. -- It returns an error if an overrun occurs.
+    --
+    -- parameter   overrun     A bit pattern that contains the smu trigger overrun
+    --                         status register result
+    --==========================================================================
+    local TestOverrunBits = function(overrun, selNode, whichSmu)
+        local whichNode = [[localnode.]]
+        if (selNode.tsplink.node ~= localnode.tsplink.node) then
+            whichNode = [[node[]] .. selNode.tsplink.node .. [[].]]
+        end
+        whichNode = whichNode .. whichSmu .. [[ (]] .. selNode.model .. [[)]]
+        if (bit.test(overrun, 2)) then
+            gOverrunDetected = true
+            return("arm overrun on " .. whichNode .. "{eol}")
+        elseif (bit.test(overrun, 3)) then
+            gOverrunDetected = true
+            return("source overrun on " .. whichNode .. "{eol}")
+        elseif (bit.test(overrun, 4)) then
+            gOverrunDetected = true
+            return("measure overrun on " .. whichNode .. "{eol}")
+        elseif (bit.test(overrun, 5)) then
+            gOverrunDetected = true
+        return("end pulse overrun on " .. whichNode .. "{eol}")
+    else
+        return("")
+    end
+end
+
+-- Report an overrun error only once.
+if(gOverrunDetected == false) then
+    local allSmusInOverrun = [[]]
+    
+    for i, selNode in ipairs(systemNodes) do
+        for j, selSmu in ipairs(systemSmus[i]) do
+            if(j == 1) then
+                local overrun = selNode.status.operation.instrument.smua.trigger_overrun.event
+                if (overrun > 0) then
+                    allSmusInOverrun = allSmusInOverrun .. TestOverrunBits(overrun, selNode, [[smua]])
+                end
+            elseif(j == 2) then
+                local overrun = selNode.status.operation.instrument.smub.trigger_overrun.event
+                if (overrun > 0) then
+                    allSmusInOverrun = allSmusInOverrun .. TestOverrunBits(overrun, selNode, [[smub]])
+                end
+            end
+        end
+    end
+    
+    if (gOverrunDetected == true) then
+        print("[{error}]Script stopped due to:{eol}" .. allSmusInOverrun)
+    end
+end
+end
+
+local gComplianceDetected = false
+--==========================================================================
+-- Checks smus for voltage or current compliance.
+-- If a compliance event occurs, the message dialog box is presented to the
+-- user.
+--==========================================================================
+local _ComplianceCheck = function()
+    -- Report a compliance error only once.
+    if(gComplianceDetected == false) then
+        local allSmusInCompliance = [[]]
+        
+        for i, selNode in ipairs(systemNodes) do
+            for j, selSmu in ipairs(systemSmus[i]) do
+                local compDetect = selNode.status.measurement.instrument.event
+                if(compDetect > 0) then
+                    -- Compose and show error message
+                    local whichNode = [[localnode.]]
+                    if (selNode.tsplink.node ~= localnode.tsplink.node) then
+                        whichNode = [[node[]] .. selNode.tsplink.node .. [[].]]
+                    end
+                    local whichSmu = [[]]
+                    if(compDetect == 2) then
+                        whichSmu = whichNode .. [[smua]]
+                    elseif (compDetect == 4) then
+                        whichSmu = whichNode .. [[smub]]
+                    elseif (compDetect == 6) then
+                        whichSmu = whichNode .. [[smua and ]] .. whichNode .. [[smub]]
+                    end
+                    whichSmu = whichSmu .. [[ (]] .. selNode.model .. [[){eol}]]
+                    allSmusInCompliance = allSmusInCompliance .. whichSmu
+                    
+                    -- Set gComplianceDetected so we don't report the error again.
+                    gComplianceDetected = true
+                end
+            end
+        end
+        
+        if (gComplianceDetected == true) then
+            print("[{info}]Compliance detected on:{eol}" .. allSmusInCompliance ..
+            "{eol}Click the Advanced button and check the Source Limit setting.")
+        end
+    end
+end
+
+local gTestAborted = false
+--==========================================================================
+-- This function waits up to a specified period for the sweeps to complete.
+-- If the delay parameter is -1, then the timeout is infinite. It returns true
+-- if all sweeping actions are complete. Otherwise, the return value is false.
+-- Note: If gTestAborted is true, this function returns false immediately.
+--
+-- parameter  interval     Maximum time to wait (in seconds).
+--==========================================================================
+local _WaitForComplete = function(interval)
+    local pollInterval = 0.1
+    
+    --==========================================================================
+    -- Checks the system smus for any that are still sweeping.
+    --==========================================================================
+    local IsSweepingComplete = function()
+        for i, selNode in ipairs(systemNodes) do
+            for j, selSmu in ipairs(systemSmus[i]) do
+                if (j == 1) then
+                    local statcond = selNode.status.operation.instrument.smua.condition
+                    if (bit.test(statcond,4)) then
+                        return false
+                    end
+                elseif (j == 2) then
+                    local statcond = selNode.status.operation.instrument.smub.condition
+                    if (bit.test(statcond,4)) then
+                        return false
+                    end
+                end
+            end
+        end
+        
+        return true
+    end
+    
+    local notimeout = false
+    if (interval < 0) then
+        notimeout = true
+        interval = 1
+    end
+    
+    while(interval > 0) do
+        -- Check the abort flag
+        if (gTestAborted == true) then
+            return false
+        end
+        
+        -- Check for errors
+        if (errorqueue.count > 0) then
+            return false
+        end
+        
+        -- Check for overruns and compliance
+        _Overruncheck()
+        _ComplianceCheck()
+        
+        if (IsSweepingComplete() == true) then
+            return true
+        end
+        
+        delay(pollInterval)
+        
+        if (notimeout == false) then
+            interval = interval - pollInterval
+        end
+    end
+    
+    if (IsSweepingComplete() == true) then
+        return true
+    end
+    
+    return false
+end
+----------------------------------------------------------------------------
+-- START OF INITIALIZE SEGMENT ... do not modify this section
+----------------------------------------------------------------------------
+--==========================================================================
+-- This function prepares the test for execution. 
+-- It first verifies that current setup matches project's setup. 
+-- Then, it initializes members used to keep track of reading buffer storage.
+--==========================================================================
+function _Initialize()
+    local maxNodes = 64   -- Maximum possible nodes in TSP link system.
+    
+    local projectSetup = {} -- Instrument configuration for the project.
+    local currentSetup = {} -- Current instrument configuration.
+    
+    local errorTag = "[{error}]"
+    local errorMessage = {[[Instrument in project configuration not found.]], [[Instrument configuration at does not match.]]}
+    local errorNo = 0
+    
+    --==========================================================================
+    -- Configures the status model to detect voltage or current compliance.
+    --==========================================================================
+    local ConfigStatusModel = function()
+        for i, selNode in ipairs(systemNodes) do
+            selNode.status.reset()
+            for j, selSmu in ipairs(systemSmus[i]) do
+                -- The selSmu.source.compliance call will force an update
+                -- the condition register of the measurement.instrument.smuX to
+                -- update
+                local dum = selSmu.source.compliance
+                if(j == 1) then
+                    -- Clear the measurement.instrument.smua event register by reading its value
+                    dum = selNode.status.measurement.instrument.smua.event
+                    -- Now configure the status model to detect voltage or current compliance
+                    selNode.status.measurement.instrument.smua.enable = 3
+                    selNode.status.measurement.instrument.smua.ptr = 3
+                    selNode.status.measurement.instrument.enable = 6
+                    selNode.status.measurement.instrument.ptr = 6
+                elseif(j == 2) then
+                    -- Clear the measurement.instrument.smub event register by reading its value
+                    dum = selNode.status.measurement.instrument.smub.event
+                    -- Now configure the status model to detect voltage or current compliance
+                    selNode.status.measurement.instrument.smub.enable = 3
+                    selNode.status.measurement.instrument.smub.ptr = 3
+                end
+            end
+        end
+    end
+    
+    --==========================================================================
+    -- Determines the current system configuration.
+    --==========================================================================
+    local GetSetup = function ()
+        local masterNode = tsplink.node
+        
+        systemSmus = {}
+        systemNodes = {}
+        systemNodes[1] = node[masterNode]
+        
+        currentSetup[1] = {}
+        currentSetup[1][1] = node[masterNode]
+        currentSetup[1][2] = node[masterNode].model
+        currentSetup[1][3] = node[masterNode].revision
+        
+        systemSmus[1] = {}
+        systemSmus[1][1] = node[masterNode].smua
+        
+        if(node[masterNode].smub ~= nil) then
+            systemSmus[1][2] = node[masterNode].smub
+        end
+        
+        local j = 2
+        for i = 1, maxNodes do
+            if((tsplink.node ~= i) and (node[i] ~= nil)) then
+                systemNodes[j] = node[i]
+                currentSetup[j] = {}
+                currentSetup[j][1] = node[i]
+                currentSetup[j][2] = node[i].model
+                currentSetup[j][3] = node[i].revision
+                
+                systemSmus[j] = {}
+                systemSmus[j][1] = node[i].smua
+                
+                if(node[i].smub ~= nil) then
+                    systemSmus[j][2] = node[i].smub
+                end
+                j = j +1
+            end
+        end
+    end
+    
+    GetSetup()
+    
+    -- Check the project setup versus the configuration setup.
+    -- If there is a difference, report an error.
+    local numpInstruments = table.getn(projectSetup)
+    local numcInstruments = table.getn(currentSetup)
+    
+    for i=1, numpInstruments do
+        local pfields = table.getn(projectSetup[i])
+        
+        errorNo = 1
+        for j=1,numcInstruments do
+            -- Compare nodes.
+            if(projectSetup[i][1] ==  currentSetup[j][1]) then
+                errorNo = 0
+                
+                for k=2, pfields do
+                    if(projectSetup[i][k] ~= currentSetup[j][k]) then
+                        errorNo = 2
+                    end
+                end
+                break
+            end
+        end
+        
+        if (errorNo > 0) then
+            break
+        end
+    end
+    
+    if (errorNo > 0) then
+        error(errorMessage[errorNo])
+        print(errorTag .. errorMessage[errorNo])
+    end
+    
+    --==========================================================================
+    -- Initializes all system readings buffers by clearing and setting them to
+    -- append mode. An array, sysSmuReadingBufferIndexes, is used to keep track of the
+    -- data stored to each of the reading buffers.
+    --==========================================================================
+    local InitalizeReadingBuffers = function()
+        systemSmuReadingBufferIndexes = {}
+        for i, selNode in ipairs(systemSmus) do
+            systemSmuReadingBufferIndexes[i] = {}
+            
+            for j, selSmu in ipairs(selNode) do
+                -- Create an array for the smu.
+                systemSmuReadingBufferIndexes[i][j] = {}
+                
+                local snvBuffers =  {selSmu.nvbuffer1, selSmu.nvbuffer2}
+                for k, selBuffer in ipairs(snvBuffers) do
+                    -- Create an array for nvbuffers 1 and 2.
+                    systemSmuReadingBufferIndexes[i][j][k] = {}
+                    
+                    local sysSmuReadingBufferIndexes = systemSmuReadingBufferIndexes[i][j][k]
+                    sysSmuReadingBufferIndexes["start"] = 0
+                    sysSmuReadingBufferIndexes["stop"] = 0
+                    
+                    selBuffer.clear()
+                    selBuffer.appendmode = 1
+                    selBuffer.collecttimestamps = 1
+                    selBuffer.collectsourcevalues = 1
+                    selBuffer.timestampresolution = 1e-6
+                    if (selBuffer.fillmode ~= nil) then
+                        selBuffer.fillmode = selSmu.FILL_ONCE
+                    end
+                end
+                
+            end
+        end
+    end
+    
+    InitalizeReadingBuffers()
+    ConfigStatusModel()
+end
+----------------------------------------------------------------------------
+-- END OF INITIALIZE SEGMENT ... do not modify code after this point
+----------------------------------------------------------------------------
+
+----------------------------------------------------------------------------
+-- START OF USER SEGMENT... This section is modify-able.
+----------------------------------------------------------------------------
+--==========================================================================
+-- User changeable segment. (This represents a User segment of the script.  Click on the User tab to customize it.)
+--==========================================================================
+function _User()
+----------
+-- The USER segment is intended for advanced users familiar with ICL
+-- and the trigger model of the instrument.  Any errors in this code
+-- could prevent the script from compiling or generate runtime errors. 
+----------
+
+
+beeper.beep(0.1,4000)
+
+  --------------------------------------------------------------------------- SRo - Code copié de la fnction SMD
+ local StoreReadingBufferIndexes = function(measureCount, bufferAccess)
+        for i, selNode in ipairs(systemSmus) do
+            for j, selSmu in ipairs(selNode) do
+                for k, selectedBufferArray in ipairs(bufferAccess) do
+                    local selectedBuffer = selectedBufferArray[1]
+                    local accessCount =  selectedBufferArray[2]
+                    
+                    if(selectedBuffer ==  selSmu.nvbuffer1) then
+                        local  selSmuRbIndex = systemSmuReadingBufferIndexes[i][j][1]
+                        selSmuRbIndex["stop"] = selSmuRbIndex["stop"] + (accessCount * measureCount)
+                    elseif (selectedBuffer ==  selSmu.nvbuffer2) then
+                        local  selSmuRbIndex = systemSmuReadingBufferIndexes[i][j][2]
+                        selSmuRbIndex["stop"] = selSmuRbIndex["stop"] + (accessCount * measureCount)
+                    end
+                end
+            end
+        end
+    end
+    local smu1 = localnode.smua -- is a 2602A
+    -- Wait for any previous test to finish.
+    _WaitForComplete(-1)
+    
+    -- Reset all SDM smus.
+    smu1.reset()
+    --Setup smu1
+    smu1.source.delay = 0
+    smu1.source.autorangei = smu1.AUTORANGE_ON
+    smu1.source.autorangev = smu1.AUTORANGE_ON
+    smu1.sense = smu1.SENSE_REMOTE
+    smu1.measure.autorangev = smu1.AUTORANGE_ON
+    smu1.measure.autorangei = smu1.AUTORANGE_ON
+    smu1.measure.nplc = 0.1
+    smu1.measure.autozero = smu1.AUTOZERO_ONCE
+    smu1.measure.count = 1
+    smu1.measure.filter.enable = smu1.FILTER_OFF
+    smu1.measure.filter.type = smu1.FILTER_MOVING_AVG
+    smu1.measure.filter.count = 1
+    smu1.measure.delay = 0
+    smu1.measure.delayfactor = 1
+    smu1.source.func = smu1.OUTPUT_DCVOLTS
+    if smu1.source.highc == smu1.ENABLE then smu1.source.highc = smu1.DISABLE end
+    smu1.source.limiti = 0.8   ---------------------------------------------------------- SRo  - set SourceA un Courant limitée à 800mA
+    smu1.source.limitv = 40     ---------------------------------------------------------- SRo  - set SourceA une Tension limitée à 40V  
+    -- Turn SDM smus on if they are not already on.
+    if(smu1.source.output ~= 1) then
+        smu1.source.output = 1
+    end
+
+
+    -- SDM Test sequence.
+    smu1.source.func = smu1.OUTPUT_DCAMPS
+    --smu1.source.leveli = 0.110   --------------------------------------------------------- SRo  - Source Courant A applique à 110.0mA
+    --delay(1E-3)
+    digio.writebit(8,1)    -------------------------------------------------------------- SRo  - lance le Trigger  I/O N°8 en TTL level 1 (+5V) pour le spectro (=pin5)
+    --delay(25E-3)           ------------------    ---------------------------------------- SRo  - Applique un delai de 25ms pour le Pulse
+	PulseIMeasureV(smua, 0.0, 0.10,20E-3, 40E-3, 1)
+    smu1.measure.iv(localnode.smua.nvbuffer1,localnode.smua.nvbuffer2)
+    smu1.source.leveli = 0
+    
+    digio.writebit(8,0)    -------------------------------------------------------------- SRo  - Annule le Trigger  I/O N°8  en TTL level 0 (+0V) pour le spectro (=pin5)
+    beeper.beep(0.1,4000)   ------------------------------------------------------------- SRo  - beep de fin de pulse
+    
+    -- Record the number of points stored in the reading buffers.
+    local bufferAccess = {{localnode.smua.nvbuffer2,1},{localnode.smua.nvbuffer1,1}}
+    StoreReadingBufferIndexes(1, bufferAccess)
+   
+
+
+
+
+end
+----------------------------------------------------------------------------
+-- END OF USER SEGMENT ... do not modify code after this point
+----------------------------------------------------------------------------
+
+----------------------------------------------------------------------------
+-- START OF DATAREPORT SEGMENT ... do not modify this section
+----------------------------------------------------------------------------
+--==========================================================================
+-- This script returns a series of reading buffers. 
+-- (This represents a DataReport segment of the script.  Click on the Data tab to customize it.)
+--==========================================================================
+function _Data()
+    local buffers = {} -- Array of reading buffers to return
+    local bufferNames = {} -- Array of reading buffer names
+    local bufferSmuNames = {} -- Array of SMU names for each reading buffer
+    local expectedCount = {} -- Array containing the expected number of return values.
+    local waitInterval = 1  -- Interval between message transfers
+    local maxToReturn = 100 -- Maximum reading buffer points between message transfers.
+    
+    -- The following are special tokens used internally by the data report function
+    local DATA_REPORT = "(({{Data}}))"
+    local SWEEPSTART = "{SWEEP-START}"
+    local START = "{START}"
+    local NAME = "{NAME}"
+    local EXPECTED_COUNT = "{EXPECTED-COUNT}"
+    local PTS_IN_BUFF = "{PTS-IN-BUFF}"
+    local PTS_RETURNED =  "{PTS-RETURNED}"
+    local BASE_TIME_STAMP = "{BASE-TIME-STAMP}"
+    local READINGS = "{READINGS}"
+    local TIMESTAMPS = "{TIMESTAMPS}"
+    local SRCVALS = "{SRCVALS}"
+    local END = "{END}"
+    local COMPLETE = "{COMPLETE}"
+    
+    local errorTag = "[{error}]"
+    local dataIndexes = {} -- Data transfer index for each reading buffer
+    local done = true  -- True when data transfer from all of reading buffers is completed
+    local dataComplete = true  -- True when all of reading buffers have reached their expected counts
+    
+    --==========================================================================
+    -- This function determines the ending points that will be in the buffer
+    -- at the time data collection takes place.
+    --==========================================================================
+    local GetStopPoints = function()
+        for i, selBuffer in ipairs(buffers) do
+            for j, selSysNode in ipairs(systemSmus) do
+                for k, selSmu in ipairs(selSysNode) do
+                    if (selSmu.nvbuffer1 == selBuffer) then
+                        expectedCount[i] = systemSmuReadingBufferIndexes[j][k][1]["stop"]
+                    elseif (selSmu.nvbuffer2 == selBuffer) then
+                        expectedCount[i] = systemSmuReadingBufferIndexes[j][k][2]["stop"]
+                    end
+                end
+            end
+        end
+    end
+    
+    --==========================================================================
+    -- Checks if the SMU for selBuffer is sweeping.
+    --==========================================================================
+    local IsSweeping = function(selBuffer)
+        for i, selNode in ipairs(systemNodes) do
+            for j, selSmu in ipairs(systemSmus[i]) do
+                if (j == 1) then
+                    if ((selSmu.nvbuffer1 == selBuffer) or (selSmu.nvbuffer2 == selBuffer)) then
+                        local statcond = selNode.status.operation.instrument.smua.condition
+                        return (bit.test(statcond,4))  -- Check Bit B3, Sweeping (SWE)
+                    end
+                elseif (j == 2) then
+                    if ((selSmu.nvbuffer1 == selBuffer) or (selSmu.nvbuffer2 == selBuffer)) then
+                        local statcond = selNode.status.operation.instrument.smub.condition
+                        return (bit.test(statcond,4))  -- Check Bit B3, Sweeping (SWE)
+                    end
+                end
+            end
+        end
+        return false
+    end
+    
+    --==========================================================================
+    -- Clears the reading buffers and resets the array that contains the
+    -- reading buffer storage start/ stop points.
+    --==========================================================================
+    local ClearReturnedBuffers = function()
+        for i, selBuffer in ipairs(buffers) do
+            selBuffer.clear()
+            
+            local smuBufferIndex = nil
+            for j, selSysNode in ipairs(systemSmus) do
+                for k, selSmu in ipairs(selSysNode) do
+                    if (selSmu.nvbuffer1 == selBuffer) then
+                        smuBufferIndex = systemSmuReadingBufferIndexes[j][k][1]
+                    elseif (selSmu.nvbuffer2 == selBuffer) then
+                        smuBufferIndex = systemSmuReadingBufferIndexes[j][k][2]
+                    end
+                end
+            end
+            if(smuBufferIndex ~= nil) then
+                smuBufferIndex["start"] = 0
+                smuBufferIndex["stop"] = 0
+            end
+        end
+    end
+    
+    GetStopPoints()
+    
+    -- Initialize dataIndex. This array is used to keep track of the points returned to
+    -- the application.
+    
+    for i, v in ipairs(buffers) do
+        dataIndexes[i] = 1
+    end
+    
+    -- The following print statements turns on data report feature within the application.
+    -- print(DATA_REPORT)
+   -- print(SWEEPSTART)
+    
+    repeat
+        done = true
+        dataComplete = true
+        for i, selBuffer in ipairs(buffers) do
+            -- Check for smu trigger model overruns.
+            _Overruncheck()
+            
+            -- Check for smu compliance.
+            _ComplianceCheck()
+            
+            -- Caution: Check for stillSweeping BEFORE getting numPointsStored
+            local stillSweeping = IsSweeping(selBuffer)
+            local numPointsStored = selBuffer.n
+            
+            -- Check for sweep completion before data is complete (i.e. something bad happened)
+            if ((numPointsStored < expectedCount[i]) and (stillSweeping == false)) then
+                gTestAborted = true
+            end
+            
+            dataComplete = dataComplete and (numPointsStored >= expectedCount[i])
+            done = done and (dataIndexes[i] > expectedCount[i])
+            
+            if(dataIndexes[i] <= numPointsStored) then
+                local points = numPointsStored - dataIndexes[i] + 1
+                
+                if(points > maxToReturn) then
+                    points = maxToReturn
+                end
+                
+                local retString = string.format("%s%s%s%d%s%d%s", NAME,  bufferNames[i], PTS_IN_BUFF, numPointsStored, PTS_RETURNED, points, START)
+                
+                if(dataIndexes[i] == 1) then
+                    retString = retString .. string.format("%s%d%s%f", EXPECTED_COUNT, expectedCount[i], BASE_TIME_STAMP, selBuffer.basetimestamp)
+                end
+                
+                local start = dataIndexes[i]
+                local stop = start + points -1
+                
+                local readings =""
+                
+                for j=start, stop do
+                    if(j == start) then
+                        readings = readings .. string.format("%s%e", READINGS, selBuffer.readings[j])
+                    else
+                        readings = readings .. string.format(",%e", selBuffer.readings[j])
+                    end
+                end
+                
+                local timestamps = ""
+                if (selBuffer.collecttimestamps == 1) then
+                    for j=start, stop do
+                        if(j == start) then
+                            timestamps = timestamps .. string.format("%s%e", TIMESTAMPS, selBuffer.timestamps[j])
+                        else
+                            timestamps = timestamps .. string.format(",%e", selBuffer.timestamps[j])
+                        end
+                    end
+                end
+                
+                local srcValues = ""
+                if (selBuffer.collectsourcevalues == 1) then
+                    for j=start, stop do
+                        if(j == start) then
+                            timestamps = timestamps .. string.format("%s%e", SRCVALS, selBuffer.sourcevalues[j])
+                        else
+                            timestamps = timestamps .. string.format(",%e", selBuffer.sourcevalues[j])
+                        end
+                    end
+                end
+                
+                dataIndexes[i] = stop +1
+                
+                retString = retString .. readings .. timestamps .. srcValues .. END
+                print(retString)
+            end
+        end
+        
+        if(dataComplete == false) then
+            if (gTestAborted == true) then
+                done = true  -- Stop waiting for data completion because it will never happen
+            else
+                delay(waitInterval)
+            end
+        end
+    until (done == true)
+    
+   -- print(COMPLETE .. "\n(({{}}))")
+    
+    -- The application may not have selected all the buffers being used in the test, so
+    -- we need to make sure the overlapped operations are complete before clearing the buffers.
+    local sweepCompleted = _WaitForComplete(-1)
+    
+    if (sweepCompleted == true) then
+        ClearReturnedBuffers()
+    end
+end
+----------------------------------------------------------------------------
+-- END OF DATAREPORT SEGMENT ... do not modify code after this point
+----------------------------------------------------------------------------
+
+----------------------------------------------------------------------------
+-- START OF FINALIZE SEGMENT ... do not modify this section
+----------------------------------------------------------------------------
+--==========================================================================
+-- The function completes the script and places the instrument in a known state.
+--==========================================================================
+function _Finalize()
+    -- Wait for test completion
+    local sweepCompleted = _WaitForComplete(-1)
+    
+    -- Check for abnornal completion
+    if (sweepCompleted == false) then
+        -- Abort all overlapped operations on all smus
+        for i, selNode in ipairs(systemNodes) do
+            for j, selSmu in ipairs(systemSmus[i]) do
+                selSmu.abort()
+            end
+        end
+        
+        -- Check for errors
+        local numErrors = errorqueue.count
+        if (numErrors > 0) then
+            local errorMsgs = [[]]
+            for i=1, numErrors do
+                local errorcode = [[]]
+                local message   = [[]]
+                local severity  = [[]]
+                local who       = [[]]
+                errorcode,message,severity,who = errorqueue.next()
+                errorMsgs = errorMsgs .. string.format('%s (error code = %d){eol}', message, errorcode or 'nil')
+                print(string.format('[{errque}]%d,%s,%s,%s', errorcode, message, severity, who or 'nil'))
+            end
+            print("[{error}]Script stopped due to error(s):{eol}" .. errorMsgs )
+        else
+            print("[{error}]Script stopped before completion." )
+        end
+    end
+    
+    -- Set output level to 0V and 0A for all SMUs
+    for i, selNode in ipairs(systemNodes) do
+        for j, selSmu in ipairs(systemSmus[i]) do
+            selSmu.source.leveli = 0
+            selSmu.source.levelv = 0
+        end
+    end
+    
+    -- Turn output off for all SMUs
+    for i, selNode in ipairs(systemNodes) do
+        for j, selSmu in ipairs(systemSmus[i]) do
+            selSmu.source.output = 0
+        end
+    end
+    
+    -- Reset the system,  placing it into a known safe state.
+    reset()
+end
+----------------------------------------------------------------------------
+-- END OF FINALIZE SEGMENT ... do not modify code after this point
+----------------------------------------------------------------------------
+
+--==========================================================================
+-- ORT This function saves the data on the remote computer.
+--==========================================================================
+function _Save()
+-- savebuffer(smua.nvbuffer1,"csv","/usb1/mybuffer5.csv") 
+
+
+format.data = format.ASCII
+format.asciiprecision = 7
+
+print("Capacity," , smua.nvbuffer1.capacity) -- champ capacity
+print("NumReading," , smua.nvbuffer1.n) -- numreadings
+print("Appendmode," , smua.nvbuffer1.appendmode)  -- append mode 
+print("TimestampResolution," , smua.nvbuffer1.timestampresolution)  -- timestamp
+print("BaseTimeStamp," , smua.nvbuffer1.basetimestamp)  -- base 
+
+print("")
+print("Reading")
+printbuffer(1, 1, smua.nvbuffer1)
+printbuffer(2, 2, smua.nvbuffer1) -- aff 2 val lues champ reading
+print("")
+
+print("Donnees des pulses")
+print("Mesure Fonction, " , "Mesure Range, " , "Status, " , "TimeStamp, " , "Source Values, " , "Source Fonction, " , "Source Range, " , "Source OutPut States, " )
+print(smua.nvbuffer1.measurefunctions[1] , smua.nvbuffer1.measureranges[1] , smua.nvbuffer1.statuses[1] , smua.nvbuffer1.timestamps[1] , smua.nvbuffer1.sourcevalues[1] , smua.nvbuffer1.sourcefunctions[1], smua.nvbuffer1.sourceranges[1] , smua.nvbuffer1.sourceoutputstates[1] )
+print(smua.nvbuffer1.measurefunctions[2] , smua.nvbuffer1.measureranges[2] , smua.nvbuffer1.statuses[2] , smua.nvbuffer1.timestamps[2] , smua.nvbuffer1.sourcevalues[2] , smua.nvbuffer1.sourcefunctions[2], smua.nvbuffer1.sourceranges[2] , smua.nvbuffer1.sourceoutputstates[2] )
+
+
+end
+----------------------------------------------------------------------------
+-- END OF SAVE SEGMENT ... do not modify code after this point
+----------------------------------------------------------------------------
+_Initialize()
+_User()
+_Data()
+_Finalize()
+_Save()
+endscript
